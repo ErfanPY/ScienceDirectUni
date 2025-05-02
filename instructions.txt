@@ -1,0 +1,11 @@
+Activate the pptp vpn from VPN.txt
+Go to gigalib.org/ip
+enter random email and click it
+click on "دسترسی مستقیم به پایگاه ها" 
+in scopus section click on "سرور 1" 
+
+load Scopus.xlsx file and get ISSN id from there
+click on advanced search on new page
+paste the query string
+"ISSN(01426001) AND (LIMIT-TO(DOCTYPE, "ar")) AND (LIMIT-TO(LANGUAGE, "English")) AND (LIMIT-TO(SRCTYPE, "j"))"
+on result page click on export and select all options and copy the count of page in page limit section and export to csv
