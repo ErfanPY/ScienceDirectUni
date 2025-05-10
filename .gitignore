@@ -1,5 +1,6 @@
 # Ignore video files
 *.mkv
+*.mp4
 
 # Python cache and venv
 __pycache__/
