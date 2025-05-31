@@ -1,0 +1,93 @@
+# docker-compose.yml
+version: '3.9' # Updated for potential newer features
+
+services:
+  redis:
+    image: redis:7-alpine # Specify a more recent version
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  db: # Optional: PostgreSQL
+    image: postgres:15-alpine # Specify a more recent version
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${SQL_USER:-scopususer}         # Use .env or default
+      - POSTGRES_PASSWORD=${SQL_PASSWORD:-scopuspassword} # Use .env or default
+      - POSTGRES_DB=${SQL_DATABASE:-scopus_db}           # Use .env or default
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # command: gunicorn --bind 0.0.0.0:8000 _base.wsgi:application # Already in Dockerfile CMD
+    volumes:
+      - .:/app # Mount current directory for development
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment: # Ensure DJANGO_SETTINGS_MODULE is set if not in Dockerfile or .env
+      - DJANGO_SETTINGS_MODULE=_base.settings
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    # command: celery -A _base worker -l info -P prefork -c 1 # Already in Dockerfile.celery CMD
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+      # If you need to mount pptp config from host:
+      # - ./vpn_config/peers:/etc/ppp/peers 
+      # - ./vpn_config/chap-secrets:/etc/ppp/chap-secrets
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=_base.settings
+      # Pass VPN credentials securely if your entrypoint script uses them for peer file
+      # - VPN_SERVER_ENV=vpn.birjand.ac.ir
+      # - VPN_USERNAME_ENV=${VPN_USERNAME} # From .env
+      # - VPN_PASSWORD_ENV=${VPN_PASSWORD} # From .env
+    depends_on:
+      - redis
+      - db # Or web, to ensure migrations might have run
+    cap_add: # For PPTP VPN client to manipulate network interfaces
+      - NET_ADMIN
+    # privileged: true # Use only if NET_ADMIN is insufficient. Try without first.
+    # sysctls: # Sometimes needed for certain network operations
+      # - net.ipv4.conf.all.rp_filter=2
+    restart: unless-stopped
+
+  flower: # Optional, for Celery monitoring
+    image: mher/flower:0.9.7 # Specify a version
+    # For Celery 5+, you might need a flower version that supports it or build your own.
+    # If mher/flower is old, consider building:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.flower # (Dockerfile that pip installs flower and celery==5.x)
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://redis:6379/0}
+      - FLOWER_PORT=5555
+    # command: flower --broker=${CELERY_BROKER_URL} --port=5555 # May depend on image
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_volume:

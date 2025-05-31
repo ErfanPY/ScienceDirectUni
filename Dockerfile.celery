@@ -1,0 +1,55 @@
+# Dockerfile.celery (for _base project)
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+# Install system dependencies for Playwright AND PPTP
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \ # For psycopg2 if using PostgreSQL
+    pptp-linux \ # For PPTP VPN client
+    procps \     # For ps command, useful for VPN scripts
+    iproute2 \   # For ip command
+    curl \       # Useful for health checks or debugging network
+    dnsutils \   # For nslookup, dig (debugging DNS within container)
+    # Add any other specific dependencies for playwright if chromium --with-deps doesn't cover all
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browsers (specifically chromium for the scraper)
+RUN playwright install --with-deps chromium
+
+# Copy VPN configuration files for PPTP (if you have them)
+# Example: if you have a 'vpn_config' directory with your /etc/ppp/peers/Behdani file
+# and potentially chap-secrets or options.pptp
+# COPY ./vpn_config/peers/Behdani /etc/ppp/peers/Behdani
+# COPY ./vpn_config/chap-secrets /etc/ppp/chap-secrets
+# RUN chmod 600 /etc/ppp/chap-secrets # Secure chap-secrets
+
+# If you need to create the Behdani peer file dynamically or ensure its presence:
+# RUN mkdir -p /etc/ppp/peers && \
+#     echo 'pty "pptp vpn.birjand.ac.ir --nolaunchpppd"' > /etc/ppp/peers/Behdani && \
+#     echo 'name 4011312071' >> /etc/ppp/peers/Behdani && \
+#     echo 'password YOUR_VPN_PASSWORD_HERE_FROM_ENV_OR_SECRET' >> /etc/ppp/peers/Behdani && \
+#     echo 'remotename PPTP' >> /etc/ppp/peers/Behdani && \
+#     echo 'require-mppe-128' >> /etc/ppp/peers/Behdani && \
+#     echo 'noauth' >> /etc/ppp/peers/Behdani && \
+#     echo 'persist' >> /etc/ppp/peers/Behdani && \
+#     echo 'maxfail 0' >> /etc/ppp/peers/Behdani && \
+#     echo 'defaultroute' >> /etc/ppp/peers/Behdani && \
+#     echo 'usepeerdns' >> /etc/ppp/peers/Behdani
+# It's better to use environment variables for credentials in the peer file if possible,
+# or use Docker secrets and a script to populate the file on container start.
+
+COPY . /app/
+
+ENV DJANGO_SETTINGS_MODULE=_base.settings
+
+# Command to run the Celery worker (single worker for now)
+# -P prefork -c 1 ensures one process, simpler for managing one VPN connection.
+CMD ["celery", "-A", "_base", "worker", "-l", "info", "-P", "prefork", "-c", "1"]
