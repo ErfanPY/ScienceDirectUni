@@ -26,3 +26,4 @@ Thumbs.db
 scopus_export.csv
 db.sqlite3
 VPN_CONFIG
+resources/VPN.txt

@@ -1,4 +1,0 @@
-vpn.birjand.ac.ir
-pptp
-4011312071
-0640663427
