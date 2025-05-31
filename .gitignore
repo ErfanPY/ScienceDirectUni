@@ -22,3 +22,7 @@ dist/
 # OS files
 .DS_Store
 Thumbs.db 
+.env
+scopus_export.csv
+db.sqlite3
+VPN_CONFIG
